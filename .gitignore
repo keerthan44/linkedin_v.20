@@ -1,0 +1,25 @@
+# Ignore data directories but keep .gitkeep files
+data/*
+!data/.gitkeep
+
+# Python cache files
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# Common data file formats
+*.csv
+*.json
+*.xlsx
+*.xls
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment and IDE files
+.env
+.venv
+env/
+venv/
+.idea/
+.vscode/
