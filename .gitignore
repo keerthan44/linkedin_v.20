@@ -1,6 +1,7 @@
 # Ignore data directories but keep .gitkeep files
 data/*
 !data/.gitkeep
+logs/*
 
 # Python cache files
 **/__pycache__/

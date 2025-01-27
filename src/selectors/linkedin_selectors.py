@@ -13,15 +13,19 @@ class PeopleSelectors:
     """CSS selectors for LinkedIn profile pages."""
     
     # Profile intro panel (name and location)
-    INTRO_PANEL = "//*[@class='mt2 relative']"
+    NAME_LOCATION_PANEL = "//*[@class='mt2 relative']"
     NAME = "h1"  # Name is in h1 tag within intro panel
     LOCATION = "//*[@class='text-body-small inline t-black--light break-words']"  # found in intro panel
+    TITLE = "[data-generated-suggestion-target]"
     
+    # About section
+    ABOUT_SECTION = "//*[@id='about'][1]/.."  # Selector for the About section
+
     # Experience section
     EXPERIENCE_SECTION = ".pvs-list__container"
     EXPERIENCE_LIST = "ul"
     EXPERIENCE_ITEM = "> .pvs-list__paged-list-item"
-    EXPERIENCE_SPAN = 'span[aria-hidden="true"]'
+    EXPERIENCE_SPAN = 'span[class="visually-hidden"]'
     
     # Education section
     EDUCATION_SECTION = ".pvs-list__container"

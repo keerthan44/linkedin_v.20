@@ -32,7 +32,7 @@ class LinkedInPeopleScraper(BaseLinkedInScraper):
         try:
             # Navigate to the profile
             await self._scraper.navigate_to(profile_url)
-            await self._scraper.wait_for_selector(self.selectors.INTRO_PANEL)
+            await self._scraper.wait_for_selector(self.selectors.NAME_LOCATION_PANEL)
             
             # Extract the data
             return await self.extract_data(profile_url, "profile")
@@ -45,7 +45,8 @@ class LinkedInPeopleScraper(BaseLinkedInScraper):
         """Extract structured data from LinkedIn HTML."""
         if data_type == 'profile':
             return {
-                'intro_panel': await self.get_intro_panel_html(),
+                'name_location_panel': await self.get_name_location_panel_html(),
+                'about_panel': await self.get_about_panel_html(),
                 'experience_panel': await self.get_experience_html(profile_url),
                 'education_panel': await self.get_education_html(profile_url),
             }
@@ -53,20 +54,33 @@ class LinkedInPeopleScraper(BaseLinkedInScraper):
 
     async def validate_data(self, data: Dict[str, Any]) -> bool:
         """Validate extracted profile data."""
-        required_fields = ['intro_panel', 'experience', 'education']
+        required_fields = ['name_location_panel', 'experience', 'education']
         return all(field in data and data[field] for field in required_fields)
 
-    async def get_intro_panel_html(self) -> str:
+    async def get_name_location_panel_html(self) -> str:
         """
         Get HTML content of the profile intro panel containing name and location.
         Returns raw HTML string of the intro section.
         """
         try:
             # Get the intro panel HTML
-            intro_panel = await self._scraper.get_element_html(self.selectors.INTRO_PANEL)
-            return intro_panel
+            name_location_panel = await self._scraper.get_element_html(self.selectors.NAME_LOCATION_PANEL)
+            return name_location_panel
         except BrowserError as e:
             logger.error(f"Failed to get intro panel HTML: {str(e)}")
+            return ""
+
+    async def get_about_panel_html(self) -> str:
+        """
+        Get HTML content of the profile About section.
+        Returns raw HTML string of the About section.
+        """
+        try:
+            # Get the About section HTML
+            about_panel = await self._scraper.get_element_html(self.selectors.ABOUT_SECTION)
+            return about_panel
+        except BrowserError as e:
+            logger.error(f"Failed to get About panel HTML: {str(e)}")
             return ""
 
     async def get_experience_html(self, profile_url: str) -> str:
@@ -158,3 +172,4 @@ class LinkedInPeopleScraper(BaseLinkedInScraper):
             # Make sure to close the page even if there's an error
             await self._scraper.close_page()
             return "" 
+    

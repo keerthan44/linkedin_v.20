@@ -5,6 +5,8 @@ from ..selectors.linkedin_selectors import PeopleSelectors
 from ..browser.exceptions import BrowserError
 import asyncio
 from datetime import datetime
+from src.utils.date_utils import DateNormalizer
+from src.models.raw_linkedin_data import RawLinkedInData
 
 from .data_extractor_interface import DataExtractorInterface
 
@@ -19,31 +21,33 @@ class HardcodedDataExtractor(DataExtractorInterface):
         self.selectors = PeopleSelectors()
         self._scraper = scraper
         self._page = None
+        self._date_normalizer = DateNormalizer()
 
     async def _init_page(self) -> None:
         """Initialize a new page if not exists."""
         if not self._page:
             self._page = await self._scraper.new_page()
+    
+    async def extract(self, raw_data: RawLinkedInData):
+        """Extract data from RawLinkedInData."""
+        await self._init_page()  # Ensure the page is initialized
+        extracted_data = {
+            # "profile_url": raw_data.name_location_panel,  # Assuming this contains the URL
+            "name": await self.extract_name(raw_data.name_location_panel),
+            "title": await self.extract_title(raw_data.name_location_panel),
+            "about": await self.extract_about(raw_data.about_panel),
+            "location": await self.extract_location(raw_data.name_location_panel),
+            "experience": await self.extract_experience(raw_data.experience_panel),
+            "education": await self.extract_education(raw_data.education_panel)
+        }
+        return extracted_data
 
-    async def _get_element_text(self, selector: str) -> str:
-        """Get text from element using the page."""
-        element = await self._page.wait_for_selector(selector)
-        if not element:
-            return ""
-        text = await element.text_content()
-        return text.strip() if text else ""
-
-    async def _evaluate_script(self, script: str) -> Any:
-        """Evaluate JavaScript on the page."""
-        return await self._page.evaluate(script)
-
-    async def extract_name(self, intro_panel: str) -> str:
-        """Extract name from profile intro panel."""
+    async def extract_title(self, name_location_panel: str) -> str:
         page = None
         try:
             page = await self._scraper.new_page()
-            await page.set_content(intro_panel)
-            element = await page.wait_for_selector(self.selectors.NAME)
+            await page.set_content(name_location_panel)
+            element = await page.wait_for_selector(self.selectors.TITLE)
             if not element:
                 return ""
             text = await element.text_content()
@@ -55,12 +59,42 @@ class HardcodedDataExtractor(DataExtractorInterface):
             if page:
                 await page.close()
 
-    async def extract_location(self, intro_panel: str) -> str:
-        """Extract location from profile intro panel."""
+
+    async def extract_name(self, name_location_panel: str) -> str:
+        """
+        Extract name from profile name/location panel.
+        
+        Args:
+            name_location_panel (str): HTML content containing the profile's name and location section
+        """
         page = None
         try:
             page = await self._scraper.new_page()
-            await page.set_content(intro_panel)
+            await page.set_content(name_location_panel)
+            element = await page.wait_for_selector(self.selectors.NAME)
+            if not element:
+                return ""
+            text = await element.text_content()
+            return text.strip() if text else ""
+        except Exception as e:
+            logger.error(f"Failed to extract name: {str(e)}")
+            return ""
+        finally:
+            if page:
+                await page.close()
+    
+
+    async def extract_location(self, name_location_panel: str) -> str:
+        """
+        Extract location from profile name/location panel.
+        
+        Args:
+            name_location_panel (str): HTML content containing the profile's name and location section
+        """
+        page = None
+        try:
+            page = await self._scraper.new_page()
+            await page.set_content(name_location_panel)
             element = await page.wait_for_selector(self.selectors.LOCATION)
             if not element:
                 return ""
@@ -87,7 +121,7 @@ class HardcodedDataExtractor(DataExtractorInterface):
             # Extract all spans text
             all_spans_text = []
             for position in positions:
-                spans = await position.locator('span[aria-hidden="true"]').all()
+                spans = await position.locator('span[class="visually-hidden"]').all()
                 span_texts = [await span.inner_text() for span in spans]
                 all_spans_text.append(span_texts)
 
@@ -144,38 +178,8 @@ class HardcodedDataExtractor(DataExtractorInterface):
 
     def _normalize_date(self, date_str):
         """Convert various date formats to YYYY-MM-DD"""
-        if not date_str or date_str == 'Present':
-            return None
-            
-        try:
-            # Remove any extra whitespace
-            date_str = date_str.strip()
-            
-            # Handle 'Present' case
-            if date_str.lower() == 'present':
-                return None
-                
-            # Try to parse common LinkedIn date formats
-            formats = [
-                '%b %Y',      # Aug 2023
-                '%B %Y',      # August 2023
-                '%Y',         # 2023
-                '%b %d, %Y',  # Aug 1, 2023
-                '%B %d, %Y'   # August 1, 2023
-            ]
-            
-            for fmt in formats:
-                try:
-                    return datetime.strptime(date_str, fmt).strftime('%Y-%m-%d')
-                except ValueError:
-                    continue
-                    
-            # If no format matches, return None
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error normalizing date {date_str}: {e}")
-            return None
+        return self._date_normalizer.normalize(date_str)
+
     async def extract_education(self, education_panel: str) -> List[Dict[str, str]]:
         """Extract education information."""
         page = None
@@ -270,6 +274,35 @@ class HardcodedDataExtractor(DataExtractorInterface):
         except Exception as e:
             logger.error(f"Failed to extract education: {str(e)}")
             return []
+        finally:
+            if page:
+                await page.close()
+
+    async def extract_about(self, about_panel: str) -> str:
+        """Extract about section from profile."""
+        page = None
+        try:
+            page = await self._scraper.new_page()
+            await page.set_content(about_panel)
+
+            # Locate the about section
+            about_section = page.locator(".display-flex.ph5.pv3").first
+
+            # Check for the "See more" button
+            see_more_button = about_section.locator("text=…see more")
+            if await see_more_button.is_visible():
+                await see_more_button.click()
+                await page.wait_for_timeout(1000)  # Wait for the text to expand
+
+                # Re-locate the about section to get the full text
+                about_section = await about_section.locator("span.visually-hidden").first
+
+            # Extract the full about text
+            about_text = await about_section.text_content()
+            return about_text.strip() if about_text else ""
+        except Exception as e:
+            logger.error(f"Failed to extract about section: {str(e)}")
+            return ""
         finally:
             if page:
                 await page.close()

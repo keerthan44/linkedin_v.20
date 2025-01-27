@@ -70,8 +70,10 @@ async def extract_profiles(profile_urls: List[str]) -> List[Dict[str, Any]]:
                 # Then extract structured data using hardcoded extractor
                 profile_data = {
                     'url': url,
-                    'name': await extractor.extract_name(raw_data.get('intro_panel', '')),
-                    'location': await extractor.extract_location(raw_data.get('intro_panel', '')),
+                    'name': await extractor.extract_name(raw_data.get('name_location_panel', '')),
+                    'title': await extractor.extract_title(raw_data.get('name_location_panel', '')),
+                    'about': await extractor.extract_about(raw_data.get('about_panel', '')),
+                    'location': await extractor.extract_location(raw_data.get('name_location_panel', '')),
                     'experience': await extractor.extract_experience(raw_data.get('experience_panel', '')),
                     'education': await extractor.extract_education(raw_data.get('education_panel', ''))
                 }
@@ -104,7 +106,7 @@ async def extract_profiles(profile_urls: List[str]) -> List[Dict[str, Any]]:
 
 async def main():
     # Example profile URLs
-    profile_urls = ['https://www.linkedin.com/in/rohinrohin']
+    profile_urls = ['https://www.linkedin.com/in/adithya-s-kolavi/']
             
     if not profile_urls:
         logger.error("No profile URLs found")
